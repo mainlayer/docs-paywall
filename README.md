@@ -3,70 +3,152 @@
 [![CI](https://github.com/mainlayer/docs-paywall/actions/workflows/ci.yml/badge.svg)](https://github.com/mainlayer/docs-paywall/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A Next.js documentation site with **gated premium content** powered by [Mainlayer](https://mainlayer.fr).
+A Next.js documentation site with **gated premium articles** powered by [Mainlayer](https://mainlayer.fr). Free articles are public; premium articles show a clean paywall until purchase. Build an audience with free content, monetize with premium deep-dives.
 
-Free sections are public. Premium sections show a paywall gate until the reader pays.
+## 5-Minute Setup
 
-## Quick Start
+### 1. Clone and install
 
 ```bash
+git clone https://github.com/mainlayer/docs-paywall
+cd docs-paywall
 npm install
-cp .env.example .env.local
-# Add your MAINLAYER_API_KEY and MAINLAYER_RESOURCE_ID
-npm run dev
 ```
 
-Visit `http://localhost:3000/docs/free-guide` (free) and `http://localhost:3000/docs/premium-guide` (paywalled).
+### 2. Set up Mainlayer
 
-## Environment Variables
+Create a Mainlayer account at [mainlayer.fr](https://mainlayer.fr):
+- Create a resource
+- Copy API key and Resource ID
+
+### 3. Configure environment
 
 ```bash
-MAINLAYER_API_KEY=mlk_xxxxxxxxxxxxxxxx
-MAINLAYER_RESOURCE_ID=res_xxxxxxxxxxxxxxxx
+cp .env.example .env.local
 ```
 
-## Adding Premium Content
-
-1. Create a markdown file in `src/content/my-article.md`
-2. Add the slug to `PREMIUM_SLUGS` in `src/app/docs/[slug]/page.tsx`:
-   ```typescript
-   const PREMIUM_SLUGS = new Set(["premium-guide", "my-article"]);
-   ```
-3. Done — the `PaywallGate` component handles the rest.
-
-## How It Works
-
+Edit `.env.local`:
+```bash
+MAINLAYER_API_KEY=ml_live_xxxxxxxxxxxxx
+MAINLAYER_RESOURCE_ID=res_xxxxxxxxxxxxx
 ```
-Visitor → /docs/premium-guide
-  → page.tsx checks PREMIUM_SLUGS
-  → wraps content in <PaywallGate>
-  → PaywallGate checks sessionStorage for token
-  → No token: shows paywall UI
-  → User clicks "Unlock" → POST /api/unlock (action=create)
-  → Server calls Mainlayer to create a payment session
-  → Token stored in sessionStorage
-  → Content renders
+
+### 4. Run locally
+
+```bash
+npm run dev
+# Visit:
+# - http://localhost:3000/docs/free-guide (public)
+# - http://localhost:3000/docs/premium-guide (gated)
 ```
+
+## Adding Gated Articles
+
+### 1. Create markdown file
+
+Add a new article to `src/content/`:
+
+```markdown
+# Advanced Techniques
+
+This is premium content...
+```
+
+### 2. Gate it (one line of code)
+
+In `src/app/docs/[slug]/page.tsx`, add to `PREMIUM_SLUGS`:
+
+```typescript
+const PREMIUM_SLUGS = new Set([
+  "premium-guide",
+  "advanced-techniques"  // ← Add here
+]);
+```
+
+### 3. Done
+
+The `<PaywallGate>` component:
+- Checks if article is in `PREMIUM_SLUGS`
+- Shows paywall if yes
+- Stores token in sessionStorage
+- Renders article if token valid
+
+Free articles have zero overhead.
 
 ## Architecture
+
+### Flow diagram
+
+```
+Visitor navigates to /docs/premium-guide
+
+1. page.tsx checks PREMIUM_SLUGS
+   ├─ If not premium → render normally
+   └─ If premium → wrap with <PaywallGate>
+
+2. PaywallGate (client-side)
+   ├─ Check sessionStorage for auth token
+   ├─ Token valid? → show article
+   └─ No token? → show paywall UI
+
+3. User clicks "Unlock"
+   ├─ POST /api/unlock
+   ├─ Server creates Mainlayer session
+   ├─ Token returned to client
+   ├─ Stored in sessionStorage
+   └─ Article renders
+
+4. Token expires
+   ├─ After 24 hours, shows paywall again
+   └─ User clicks "Refresh" to get new token
+```
+
+### File structure
 
 ```
 src/
 ├── app/
-│   ├── layout.tsx                  # Root layout with nav
-│   ├── docs/[slug]/page.tsx        # Doc page with paywall logic
-│   └── api/unlock/route.ts         # Mainlayer payment API
+│   ├── layout.tsx                    # Nav bar
+│   ├── docs/[slug]/page.tsx          # Article loader
+│   └── api/unlock/route.ts           # Payment session API
 ├── components/
-│   └── PaywallGate.tsx             # Client-side paywall component
+│   └── PaywallGate.tsx               # Paywall UI component
 ├── lib/
-│   └── mainlayer.ts                # Mainlayer SDK wrapper
+│   └── mainlayer.ts                  # Mainlayer SDK
 └── content/
-    ├── free-guide.md               # Free content
-    └── premium-guide.md            # Gated premium content
+    ├── free-guide.md                 # Free articles
+    └── premium-guide.md              # Gated articles
 ```
 
-## Deploy
+## Monetization Model
 
-Works with any Next.js host (Vercel, Netlify, etc.). Set environment variables in your hosting dashboard.
+| Visitor Type | Experience | You Earn |
+|--------------|-----------|----------|
+| Free article reader | Full access | Nothing |
+| Premium article interest | Sees paywall | $5-$500 per unlock |
+| Subscriber | Monthly access | Recurring revenue |
 
-Get your API key at [mainlayer.fr](https://mainlayer.fr).
+## Deployment
+
+### Vercel (recommended)
+
+```bash
+npx vercel
+# Set MAINLAYER_API_KEY and MAINLAYER_RESOURCE_ID in dashboard
+```
+
+### Docker / Self-hosted
+
+```bash
+npm run build
+npm run start
+# Set env vars before starting
+```
+
+### Environment variables
+
+Set these in your hosting platform:
+- `MAINLAYER_API_KEY`
+- `MAINLAYER_RESOURCE_ID`
+
+No secrets stored in source code.
